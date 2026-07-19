@@ -66,6 +66,8 @@ internal sealed record AviCodecChoice(
 
 internal sealed class AviWriter
 {
+    private const long DefaultMaxSegmentBytes = 3_900_000_000L;
+    private const long ContainerOverheadReserveBytes = 16L * 1024 * 1024;
     private const int OfWrite = 0x00000001;
     private const int OfCreate = 0x00001000;
     private const int AviIfKeyFrame = 0x00000010;
@@ -131,14 +133,15 @@ internal sealed class AviWriter
         return choices;
     }
 
-    public void Write(
+    public IReadOnlyList<string> Write(
         IReadOnlyList<string> files,
         string outputPath,
         int fps,
         AviCodecChoice codec,
         Action<string> log,
         Action<int> progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long maxSegmentBytes = DefaultMaxSegmentBytes)
     {
         if (files.Count == 0)
         {
@@ -152,58 +155,23 @@ internal sealed class AviWriter
         var bitCount = (ushort)(codec.UseAlpha ? 32 : 24);
         // HOW: WindowsのDIB仕様に合わせ、1行のバイト数を4の倍数へ切り上げます。
         var rowSize = ((width * bytesPerPixel + 3) / 4) * 4;
-        var imageSize = rowSize * height;
+        var imageSize = checked(rowSize * height);
+
+        if (maxSegmentBytes <= ContainerOverheadReserveBytes + imageSize)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxSegmentBytes),
+                "AVI分割サイズは1フレームとコンテナー管理領域より大きく指定してください。");
+        }
 
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? ".");
+        DeleteExistingOutputSet(outputPath);
+        var outputPaths = new List<string>();
 
-        IntPtr aviFile = IntPtr.Zero;
-        IntPtr rawStream = IntPtr.Zero;
-        IntPtr outputStream = IntPtr.Zero;
-        IntPtr formatPtr = IntPtr.Zero;
-
-        // WHY NOT: 初期化と解放を呼び出し元へ分散しません。
-        // 途中で例外や停止が発生しても、このメソッド内のfinallyで必ず後片付けするためです。
         AVIFileInit();
 
         try
         {
-            ThrowIfFailed(AVIFileOpenW(out aviFile, outputPath, OfWrite | OfCreate, IntPtr.Zero), "AVIファイルを開けませんでした。");
-
-            var streamInfo = new AviStreamInfo
-            {
-                fccType = StreamTypeVideo,
-                fccHandler = 0,
-                dwScale = 1,
-                dwRate = fps,
-                dwSuggestedBufferSize = imageSize,
-                dwQuality = -1,
-                rcFrame = new AviRect { left = 0, top = 0, right = width, bottom = height },
-                szName = "PNG sequence"
-            };
-
-            ThrowIfFailed(AVIFileCreateStreamW(aviFile, out rawStream, ref streamInfo), "AVIストリームを作成できませんでした。");
-
-            if (codec.IsUncompressed)
-            {
-                outputStream = rawStream;
-                log("無圧縮AVIで作成します。");
-            }
-            else
-            {
-                var options = new AviCompressOptions
-                {
-                    fccType = StreamTypeVideo,
-                    fccHandler = codec.FourCc,
-                    dwQuality = -1
-                };
-
-                ThrowIfFailed(
-                    AVIMakeCompressedStream(out outputStream, rawStream, ref options, IntPtr.Zero),
-                    $"{codec.DisplayName} を呼び出せませんでした。64bit版コーデックがインストールされているか確認してください。");
-
-                log($"{codec.DisplayName} [{FourCcToString(codec.FourCc)}] を使用します。");
-            }
-
             var bitmapInfo = new BitmapInfoHeader
             {
                 biSize = (uint)Marshal.SizeOf<BitmapInfoHeader>(),
@@ -215,61 +183,106 @@ internal sealed class AviWriter
                 biSizeImage = (uint)imageSize
             };
 
-            formatPtr = Marshal.AllocHGlobal(Marshal.SizeOf<BitmapInfoHeader>());
-            Marshal.StructureToPtr(bitmapInfo, formatPtr, false);
-            ThrowIfFailed(
-                AVIStreamSetFormat(outputStream, 0, formatPtr, Marshal.SizeOf<BitmapInfoHeader>()),
-                "AVIストリームの画像形式を設定できませんでした。");
-
             progress(0);
-            for (var index = 0; index < files.Count; index++)
+            AviSegment? segment = null;
+
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                // HOW: RGBA対応コーデックは32bit、それ以外は24bitのDIBフレームを作ります。
-                var frame = codec.UseAlpha
-                    ? CreateDibFrame32(files[index], width, height, rowSize)
-                    : CreateDibFrame24(files[index], width, height, rowSize);
-                var framePtr = Marshal.AllocHGlobal(frame.Length);
-
-                try
+                for (var index = 0; index < files.Count; index++)
                 {
-                    Marshal.Copy(frame, 0, framePtr, frame.Length);
-                    ThrowIfFailed(
-                        AVIStreamWrite(outputStream, index, 1, framePtr, frame.Length, AviIfKeyFrame, IntPtr.Zero, IntPtr.Zero),
-                        $"フレームを書き込めませんでした: {Path.GetFileName(files[index])}");
-                }
-                finally
-                {
-                    Marshal.FreeHGlobal(framePtr);
-                }
+                    cancellationToken.ThrowIfCancellationRequested();
 
-                progress(index + 1);
+                    // HOW: RGBA対応コーデックは32bit、それ以外は24bitのDIBフレームを作ります。
+                    var frame = codec.UseAlpha
+                        ? CreateDibFrame32(files[index], width, height, rowSize)
+                        : CreateDibFrame24(files[index], width, height, rowSize);
+
+                    if (segment is null || segment.WouldExceedLimit(frame.Length, maxSegmentBytes))
+                    {
+                        if (segment is not null)
+                        {
+                            segment.Dispose();
+                            log($"AVI 4GB制限を回避するため次のファイルへ分割します。");
+                        }
+
+                        var segmentPath = GetSegmentPath(outputPath, outputPaths.Count);
+                        segment = new AviSegment(
+                            segmentPath,
+                            width,
+                            height,
+                            fps,
+                            imageSize,
+                            codec,
+                            bitmapInfo);
+                        outputPaths.Add(segmentPath);
+                        log($"出力ファイル: {segmentPath}");
+
+                        if (codec.IsUncompressed)
+                        {
+                            log("無圧縮AVIで作成します。");
+                        }
+                        else
+                        {
+                            log($"{codec.DisplayName} [{FourCcToString(codec.FourCc)}] を使用します。");
+                        }
+                    }
+
+                    segment.WriteFrame(frame, files[index]);
+                    progress(index + 1);
+                }
+            }
+            finally
+            {
+                segment?.Dispose();
             }
         }
         finally
         {
-            if (formatPtr != IntPtr.Zero)
-            {
-                Marshal.FreeHGlobal(formatPtr);
-            }
-
-            if (outputStream != IntPtr.Zero && outputStream != rawStream)
-            {
-                AVIStreamRelease(outputStream);
-            }
-
-            if (rawStream != IntPtr.Zero)
-            {
-                AVIStreamRelease(rawStream);
-            }
-
-            if (aviFile != IntPtr.Zero)
-            {
-                AVIFileRelease(aviFile);
-            }
-
             AVIFileExit();
+        }
+
+        return outputPaths;
+    }
+
+    private static string GetSegmentPath(string outputPath, int segmentIndex)
+    {
+        if (segmentIndex == 0)
+        {
+            return outputPath;
+        }
+
+        var directory = Path.GetDirectoryName(outputPath) ?? string.Empty;
+        var fileName = Path.GetFileNameWithoutExtension(outputPath);
+        var extension = Path.GetExtension(outputPath);
+        return Path.Combine(directory, $"{fileName}_part{segmentIndex + 1:D3}{extension}");
+    }
+
+    private static void DeleteExistingOutputSet(string outputPath)
+    {
+        if (File.Exists(outputPath))
+        {
+            File.Delete(outputPath);
+        }
+
+        var directory = Path.GetDirectoryName(outputPath) ?? ".";
+        var fileName = Path.GetFileNameWithoutExtension(outputPath);
+        var extension = Path.GetExtension(outputPath);
+        var partPrefix = $"{fileName}_part";
+
+        foreach (var candidate in Directory.EnumerateFiles(directory))
+        {
+            var candidateName = Path.GetFileNameWithoutExtension(candidate);
+            if (!string.Equals(Path.GetExtension(candidate), extension, StringComparison.OrdinalIgnoreCase)
+                || !candidateName.StartsWith(partPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var partNumber = candidateName[partPrefix.Length..];
+            if (partNumber.Length == 3 && int.TryParse(partNumber, out _))
+            {
+                File.Delete(candidate);
+            }
         }
     }
 
@@ -413,6 +426,161 @@ internal sealed class AviWriter
         }
     }
 
+    private sealed class AviSegment : IDisposable
+    {
+        private IntPtr _aviFile;
+        private IntPtr _rawStream;
+        private IntPtr _outputStream;
+        private int _frameCount;
+        private long _payloadBytes;
+        private bool _disposed;
+
+        public AviSegment(
+            string path,
+            int width,
+            int height,
+            int fps,
+            int imageSize,
+            AviCodecChoice codec,
+            BitmapInfoHeader bitmapInfo)
+        {
+            try
+            {
+                ThrowIfFailed(
+                    AVIFileOpenW(out _aviFile, path, OfWrite | OfCreate, IntPtr.Zero),
+                    "AVIファイルを開けませんでした。");
+
+                var streamInfo = new AviStreamInfo
+                {
+                    fccType = StreamTypeVideo,
+                    fccHandler = 0,
+                    dwScale = 1,
+                    dwRate = fps,
+                    dwSuggestedBufferSize = imageSize,
+                    dwQuality = -1,
+                    rcFrame = new AviRect { left = 0, top = 0, right = width, bottom = height },
+                    szName = "PNG sequence"
+                };
+
+                ThrowIfFailed(
+                    AVIFileCreateStreamW(_aviFile, out _rawStream, ref streamInfo),
+                    "AVIストリームを作成できませんでした。");
+
+                if (codec.IsUncompressed)
+                {
+                    _outputStream = _rawStream;
+                }
+                else
+                {
+                    var options = new AviCompressOptions
+                    {
+                        fccType = StreamTypeVideo,
+                        fccHandler = codec.FourCc,
+                        dwQuality = -1
+                    };
+
+                    ThrowIfFailed(
+                        AVIMakeCompressedStream(out _outputStream, _rawStream, ref options, IntPtr.Zero),
+                        $"{codec.DisplayName} を呼び出せませんでした。64bit版コーデックがインストールされているか確認してください。");
+                }
+
+                var formatPtr = Marshal.AllocHGlobal(Marshal.SizeOf<BitmapInfoHeader>());
+                try
+                {
+                    Marshal.StructureToPtr(bitmapInfo, formatPtr, false);
+                    ThrowIfFailed(
+                        AVIStreamSetFormat(_outputStream, 0, formatPtr, Marshal.SizeOf<BitmapInfoHeader>()),
+                        "AVIストリームの画像形式を設定できませんでした。");
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(formatPtr);
+                }
+            }
+            catch
+            {
+                Dispose();
+                throw;
+            }
+        }
+
+        public bool WouldExceedLimit(int nextFrameBytes, long maxSegmentBytes)
+        {
+            if (_frameCount == 0)
+            {
+                return false;
+            }
+
+            // HOW: 圧縮後の実績値に、次フレームが無圧縮相当まで増える最悪値と
+            // RIFFヘッダー・idx1索引用の余裕を加えて4GB境界より前で分割します。
+            return _payloadBytes + nextFrameBytes + ContainerOverheadReserveBytes > maxSegmentBytes;
+        }
+
+        public void WriteFrame(byte[] frame, string sourcePath)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var framePtr = Marshal.AllocHGlobal(frame.Length);
+
+            try
+            {
+                Marshal.Copy(frame, 0, framePtr, frame.Length);
+                ThrowIfFailed(
+                    AVIStreamWrite(
+                        _outputStream,
+                        _frameCount,
+                        1,
+                        framePtr,
+                        frame.Length,
+                        AviIfKeyFrame,
+                        out var samplesWritten,
+                        out var bytesWritten),
+                    $"フレームを書き込めませんでした: {Path.GetFileName(sourcePath)}");
+
+                if (samplesWritten != 1)
+                {
+                    throw new InvalidOperationException(
+                        $"フレームを完全に書き込めませんでした: {Path.GetFileName(sourcePath)}");
+                }
+
+                var payloadBytes = bytesWritten > 0 ? bytesWritten : frame.Length;
+                _payloadBytes += payloadBytes + 8L + (payloadBytes & 1);
+                _frameCount++;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(framePtr);
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+
+            if (_outputStream != IntPtr.Zero && _outputStream != _rawStream)
+            {
+                AVIStreamRelease(_outputStream);
+                _outputStream = IntPtr.Zero;
+            }
+
+            if (_rawStream != IntPtr.Zero)
+            {
+                AVIStreamRelease(_rawStream);
+                _rawStream = IntPtr.Zero;
+            }
+
+            if (_aviFile != IntPtr.Zero)
+            {
+                AVIFileRelease(_aviFile);
+                _aviFile = IntPtr.Zero;
+            }
+        }
+    }
+
     private sealed record InstalledCodec(int FourCc, string Name, string Description);
 
     // 変更不可: 以下はWindows APIとの契約です。引数型・順序・CharSetを変更しないでください。
@@ -444,7 +612,15 @@ internal sealed class AviWriter
     private static extern int AVIStreamSetFormat(IntPtr pavi, int lPos, IntPtr lpFormat, int cbFormat);
 
     [DllImport("avifil32.dll")]
-    private static extern int AVIStreamWrite(IntPtr pavi, int lStart, int lSamples, IntPtr lpBuffer, int cbBuffer, int dwFlags, IntPtr plSampWritten, IntPtr plBytesWritten);
+    private static extern int AVIStreamWrite(
+        IntPtr pavi,
+        int lStart,
+        int lSamples,
+        IntPtr lpBuffer,
+        int cbBuffer,
+        int dwFlags,
+        out int plSampWritten,
+        out int plBytesWritten);
 
     [DllImport("avifil32.dll")]
     private static extern int AVIStreamRelease(IntPtr pavi);

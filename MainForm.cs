@@ -308,7 +308,7 @@ public sealed class MainForm : Form
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 86));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 86));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 104));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 86));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
 
@@ -409,8 +409,8 @@ public sealed class MainForm : Form
 
         _codecBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _codecBox.DrawMode = DrawMode.OwnerDrawFixed;
-        _codecBox.ItemHeight = 52;
-        _codecBox.DropDownHeight = 210;
+        _codecBox.ItemHeight = 36;
+        _codecBox.DropDownHeight = 146;
         _codecBox.MaxDropDownItems = 4;
         _codecBox.IntegralHeight = false;
         _codecBox.Dock = DockStyle.Fill;
@@ -423,10 +423,14 @@ public sealed class MainForm : Form
         _codecBox.DropDown += (_, _) => BeginInvoke(new Action(() => ApplyComboDropDownRegion(_codecBox, 8)));
         _codecBox.Items.AddRange(AviWriter.GetCodecChoices().Cast<object>().ToArray());
         _codecBox.SelectedIndex = 0;
-        field.Controls.Add(
-            CreateRoundedFieldHost(_codecBox, new Padding(0, 2, 0, 4), Surface, new Padding(3)),
-            0,
-            1);
+        var codecHost = CreateRoundedFieldHost(
+            _codecBox,
+            new Padding(0),
+            Surface,
+            new Padding(3));
+        codecHost.Dock = DockStyle.Top;
+        codecHost.Height = 48;
+        field.Controls.Add(codecHost, 0, 1);
 
         return field;
     }
@@ -900,7 +904,7 @@ public sealed class MainForm : Form
             Log($"AVI作成を開始します: {outputPath}");
             // WHY NOT: AVI書き込みをUIスレッド上で直接実行しません。
             // 変換中に画面が固まり、停止ボタンや進捗表示が動かなくなるためです。
-            await Task.Run(() => _writer.Write(
+            var outputPaths = await Task.Run(() => _writer.Write(
                 _sequence.Files,
                 outputPath,
                 fps.Value,
@@ -910,7 +914,18 @@ public sealed class MainForm : Form
                 _cancellation.Token));
 
             SetProgress(_sequence.Count);
-            Log($"AVI作成完了: {outputPath}");
+            if (outputPaths.Count == 1)
+            {
+                Log($"AVI作成完了: {outputPaths[0]}");
+            }
+            else
+            {
+                Log($"AVI作成完了: {outputPaths.Count} ファイルに分割しました。");
+                foreach (var path in outputPaths)
+                {
+                    Log($"  {path}");
+                }
+            }
         }
         catch (OperationCanceledException)
         {

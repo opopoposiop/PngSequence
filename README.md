@@ -54,6 +54,9 @@ powershell -ExecutionPolicy Bypass -File .\build-single-exe.ps1
 bin\Release\net8.0-windows\win-x64\publish\PngSequenceAvi.exe
 ```
 
+AVIが約3.9GBに近づく場合は、従来形式の4GB制限を避けるため自動的に複数ファイルへ分割します。
+2つ目以降は `_part002.avi`、`_part003.avi` のような名前で同じフォルダーへ保存されます。
+
 ## ソース構成
 
 | ファイル | 役割 |
