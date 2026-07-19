@@ -1,5 +1,5 @@
 param(
-    [string]$ExecutablePath = "D:\Projects\PngSequence\bin\Release\net8.0-windows10.0.22000.0\win-x64\PngSequenceAvi.exe",
+    [string]$ExecutablePath = "D:\Projects\PngSequence\bin\Release\net8.0-windows\win-x64\PngSequenceAvi.exe",
     [string]$OutputPath = "D:\Projects\PngSequence\current-ui.png",
     [switch]$OpenCodecList
 )

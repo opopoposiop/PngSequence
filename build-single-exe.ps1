@@ -21,7 +21,8 @@ dotnet publish `
   -r win-x64 `
   --self-contained true `
   -p:PublishSingleFile=true `
-  -p:IncludeNativeLibrariesForSelfExtract=true
+  -p:IncludeNativeLibrariesForSelfExtract=true `
+  -p:EnableCompressionInSingleFile=true
 
 if ($LASTEXITCODE -ne 0) {
   throw "dotnet publish failed. Exit code: $LASTEXITCODE"
@@ -29,4 +30,4 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Build completed."
-Write-Host "bin\Release\net8.0-windows10.0.22000.0\win-x64\publish\PngSequenceAvi.exe"
+Write-Host "bin\Release\net8.0-windows\win-x64\publish\PngSequenceAvi.exe"

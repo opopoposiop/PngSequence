@@ -64,7 +64,7 @@ public sealed class MainForm : Form
     {
         Text = "PNG Sequence AVI Forge";
         MinimumSize = new Size(1040, 720);
-        Size = new Size(1120, 760);
+        Size = new Size(1280, 760);
         BackColor = Background;
         ForeColor = TextColor;
         Font = new Font("Noto Sans JP", 10.5F, FontStyle.Regular, GraphicsUnit.Point);
