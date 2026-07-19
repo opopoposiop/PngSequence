@@ -1,0 +1,20 @@
+# .NET build output: recreate these files with dotnet build/publish.
+bin/
+obj/
+
+# Local UI captures and design previews.
+*.png
+design-preview/
+
+# Local tool/install artifacts.
+tools/
+gh_*.msi
+gh_*.zip
+gh-install.log
+
+# IDE and OS files.
+.vs/
+*.user
+*.suo
+Thumbs.db
+Desktop.ini

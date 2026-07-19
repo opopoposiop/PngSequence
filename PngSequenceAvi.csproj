@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    ユーザーが変更してよい箇所:
+    - AssemblyName（出力ファイル名を変えたい場合）
+
+    変更不可の箇所:
+    - TargetFramework、UseWindowsForms、ApplicationManifest、ApplicationHighDpiMode
+
+    Codex用覚書:
+    - HOW: .NET 8のWindows Formsアプリを、Windows 11向け・PerMonitorV2のDPI対応で構成する。
+    - WHY NOT: TargetFrameworkやRuntimeIdentifierを根拠なく更新しない。
+      Windows API連携と配布先の互換性を再検証する必要があるため。
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.22000.0</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>PngSequenceAvi</AssemblyName>
+    <RootNamespace>PngSequenceAvi</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+</Project>
