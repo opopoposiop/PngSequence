@@ -128,6 +128,5 @@ bin\Release\net8.0-windows10.0.22000.0\win-x64\publish\PngSequenceAvi.exe
 
 UIは次のデザインシステムを参考にしています。
 
-```text
-D:\Projects\Refine_PngSequence\design-system-example-components-html
-```
+https://www.digital.go.jp/policies/servicedesign/designsystem
+
