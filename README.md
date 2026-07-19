@@ -1,32 +1,52 @@
-# PNG Sequence AVI Forge
+# PNG Sequence Video Forge
 
-連番PNGを読み込み、Windows上でAVIへ変換するデスクトップアプリです。
+連番PNGを読み込み、Apple ProRes 4444 MOVまたはOpenDML AVIへ変換するWindowsデスクトップアプリです。
 
-## 主な機能
+## v1.3.0の主な変更
 
-- PNGファイルまたはPNGフォルダーのドラッグ＆ドロップ
-- ファイル名末尾の連番を読み取って並べ替え
-- 1～240 FPSの指定
-- 無圧縮AVIの出力
-- UtVideo RGB / RGBA Codecの検出と選択
-- 変換状況、ログ、進捗率の表示
+- Apple ProRes 4444 MOVを出力形式の1番目に追加
+- 無圧縮OpenDML AVIを2番目に配置
+- AVIの作成をWindows AVIFile APIからFFmpegのAVI muxerへ移行
+- 4GBを超えるAVIを分割せず、OpenDML対応の単一ファイルとして出力
+- UtVideoエンコーダーをFFmpegに同梱し、外部Codecのインストールを不要化
+- 出力形式プルダウンの項目高を文字サイズに合わせて調整
+
+## 出力形式
+
+プルダウンには次の順で表示されます。
+
+1. Apple ProRes 4444 MOV
+2. 無圧縮 AVI (OpenDML)
+3. UtVideo RGB AVI (OpenDML)
+4. UtVideo RGBA AVI (OpenDML)
+5. UtVideo YUV420 BT.601 AVI (OpenDML)
+6. UtVideo YUV422 BT.601 AVI (OpenDML)
+7. UtVideo YUV420 BT.709 AVI (OpenDML)
+8. UtVideo YUV422 BT.709 AVI (OpenDML)
+
+ProRes 4444は`prores_ks`、profile 4、`yuva444p10le`、16bitアルファで出力します。RGBA PNGのアルファチャンネルを保持できます。
+
+AVIはFFmpegのOpenDML対応AVI muxerで作成します。従来のRIFF AVIで問題になっていた約4GBの境界を越えても、自動分割せず1つの`.avi`として保存します。必要な空き容量と、保存先ファイルシステムの最大ファイルサイズには注意してください。FAT32には4GBを超えるファイルを保存できません。
 
 ## 必要環境
 
 - Windows 11 64bit
-- .NET 8 SDK（ビルド時）
-- UtVideoを使用する場合は、64bit版UtVideo Codec
+- 配布版の実行には.NETやCodecの追加インストール不要
+- ソースからのビルドには.NET 8 SDKとPowerShell
+- FFmpeg取得時はインターネット接続
+
+FFmpegは単一EXE内に埋め込まれ、最初の変換時に`%LOCALAPPDATA%\PngSequenceAvi\ffmpeg`以下へ整合性を確認して展開されます。アプリが外部の`ffmpeg.exe`を探索することはありません。
 
 ## 使い方
 
 1. `PngSequenceAvi.exe`を起動します。
 2. 連番PNGまたはPNGが入ったフォルダーをドロップします。
-3. AVI出力先フォルダーを選択します。
+3. 動画出力先フォルダーを選択します。
 4. フレームレートを入力します。
-5. AVI圧縮形式を選択します。
-6. 「AVIに変換」をクリックします。
+5. 出力形式を選択します。
+6. 「動画に変換」をクリックします。
 
-ファイル名の例です。
+連番ファイル名の例:
 
 ```text
 frame_0001.png
@@ -34,28 +54,32 @@ frame_0002.png
 frame_0003.png
 ```
 
-ファイル名の途中に番号がある場合も、末尾の番号を連番として使用します。
+ファイル名末尾の番号を使用して並べ替えます。
 
 ## ビルド
 
+通常のReleaseビルド:
+
 ```powershell
+powershell -ExecutionPolicy Bypass -File .\prepare-ffmpeg.ps1
 dotnet build -c Release
 ```
 
-単一実行ファイルを作成する場合は、次を実行します。
+単一実行ファイル:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build-single-exe.ps1
 ```
 
-生成物は次の場所に作成されます。
+`prepare-ffmpeg.ps1`は固定したBtbN LGPLビルドを取得し、アーカイブと`ffmpeg.exe`のSHA-256を検証します。生成物:
 
 ```text
 bin\Release\net8.0-windows\win-x64\publish\PngSequenceAvi.exe
 ```
 
-AVIが約3.9GBに近づく場合は、従来形式の4GB制限を避けるため自動的に複数ファイルへ分割します。
-2つ目以降は `_part002.avi`、`_part003.avi` のような名前で同じフォルダーへ保存されます。
+## FFmpegとライセンス
+
+同梱物はBtbN FFmpeg BuildsのLGPL版です。固定バージョン、取得元、SHA-256、ソース入手先は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)に記載しています。ライセンス全文は[FFMPEG-LICENSE.txt](FFMPEG-LICENSE.txt)を参照してください。
 
 ## ソース構成
 
@@ -64,52 +88,22 @@ AVIが約3.9GBに近づく場合は、従来形式の4GB制限を避けるため
 | `Program.cs` | アプリケーションの起動 |
 | `MainForm.cs` | UI、入力、ドラッグ＆ドロップ、変換進捗 |
 | `SequenceSpec.cs` | PNGの連番解析 |
-| `AviWriter.cs` | PNGからAVIへの変換とWindows API呼び出し |
-| `PngSequenceAvi.csproj` | .NETとWindows Formsのビルド設定 |
-| `app.manifest` | Windows実行時の設定 |
-| `build-single-exe.ps1` | 単一実行ファイルの作成 |
-
-## 変更してよい箇所
-
-非エンジニアの方が変更する場合は、まず次の箇所を対象にしてください。
-
-- `MainForm.cs`の色、文字サイズ、余白、表示文言
-- `AviWriter.cs`の`knownFallbacks`にあるCodec候補
-- READMEの説明文
-
-変更後は必ずReleaseビルドとアプリ起動を確認してください。
-
-## 変更しない箇所
-
-次の処理はWindows API、メモリ管理、スレッド処理に関係するため、動作を理解せず変更しないでください。
-
-- `AviWriter.cs`の`DllImport`宣言
-- `Marshal.AllocHGlobal`と`Marshal.FreeHGlobal`の対応
-- `AVIFileInit`、`AVIFileExit`、各`Release`処理
-- DIBの4バイト境界と画像の上下反転処理
-- `MainForm.cs`の`InvokeRequired`とキャンセル処理
-- `Program.cs`の`[STAThread]`と`ApplicationConfiguration.Initialize()`
-
-## コメントとコミットのルール
-
-- コードには`HOW`を書く：どのように処理しているか
-- テストコードには`WHAT`を書く：何を確認するテストか
-- コードコメントには`WHY NOT`を書く：なぜ別の方法を採用しないか
-- コミットメッセージには`WHY`を書く：なぜ変更したか
-- 非エンジニアにも伝わる日本語で、変更可能箇所と変更不可箇所を説明する
+| `VideoWriter.cs` | FFmpeg起動、PNGパイプ入力、MOV/OpenDML AVI出力 |
+| `prepare-ffmpeg.ps1` | 固定FFmpegの取得・SHA-256検証 |
+| `build-single-exe.ps1` | 圧縮済み単一実行ファイルの作成 |
+| `PngSequenceAvi.csproj` | .NETとFFmpeg埋め込みのビルド設定 |
 
 ## テスト項目
 
-自動テストプロジェクトはありません。変更後は次を手動確認します。
+変更後は次を確認します。
 
-1. アプリが起動する
-2. PNGフォルダーをドロップできる
-3. 複数PNGを選択できる
-4. 連番が正しく表示される
-5. AVIを出力できる
-6. 変換中に進捗が更新される
-7. 停止操作が動作する
-8. 100%、150%、175%のDPIで表示が崩れない
+1. アプリが起動し、出力形式が上記の順で表示される
+2. PNGフォルダーと複数PNGを読み込める
+3. ProRes 4444 MOVを作成でき、アルファを保持する
+4. 無圧縮AVIと各UtVideo AVIを作成できる
+5. 4GBを超えるAVIがOpenDML単一ファイルとして完了する
+6. 進捗表示と停止操作が動作する
+7. 100%、150%、175%のDPIで表示が崩れない
 
 ## トラブルシューティング
 
@@ -119,16 +113,13 @@ AVIが約3.9GBに近づく場合は、従来形式の4GB制限を避けるため
 - ファイル名末尾に数字があることを確認してください。
 - すべての画像サイズが同じであることを確認してください。
 
-### UtVideoが使用できない
+### 変換できない
 
-64bit版Codecがインストールされていることを確認してから、アプリを再起動してください。
-
-### AVIを出力できない
-
-出力先の書き込み権限、空き容量、同名AVIを別アプリで開いていないかを確認してください。
+- 出力先の書き込み権限と空き容量を確認してください。
+- 同名のMOV/AVIを別アプリで開いていないか確認してください。
+- 4GBを超える場合、保存先がNTFSまたはexFATであることを確認してください。
+- セキュリティソフトが`%LOCALAPPDATA%\PngSequenceAvi\ffmpeg`の実行を遮断していないか確認してください。
 
 ## UIデザイン
 
-UIは次のデザインシステムを参考にしています。
-
-https://www.digital.go.jp/policies/servicedesign/designsystem
+UIは[デジタル庁デザインシステム](https://www.digital.go.jp/policies/servicedesign/designsystem)を参考にしています。

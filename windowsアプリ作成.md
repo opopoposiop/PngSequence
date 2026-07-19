@@ -2,9 +2,9 @@
 
 ## アプリの機能
 
-連番PNGファイルからAVIファイルを作成する。
+連番PNGファイルからApple ProRes 4444 MOVまたはOpenDML AVIを作成する。
 
-AVIファイル作成には、無圧縮またはインストール済みUT Video Codecを使用する。
+動画作成には、アプリへ同梱したLGPL版FFmpegを使用する。
 
 ## 動作OS
 
@@ -17,8 +17,8 @@ exeファイル単体起動
 ## ユーザーインターフェイス
 
 - 画像ファイルのドロップエリア
-- AVI出力先フォルダ
-- AVI圧縮方式選択
+- 動画出力先フォルダ
+- 出力形式選択
 - FPS入力
 - 動作状況表示
 - 停止ボタン
@@ -28,17 +28,12 @@ exeファイル単体起動
 ## 動作の概略
 
 1. 連番PNGファイルをドロップ
-2. AVIファイルの圧縮方法を選択
-   - 無圧縮
-   - Windowsにインストール済みのUT Video Codec
-3. AVIファイル作成
+2. 出力形式を選択
+   - Apple ProRes 4444 MOV
+   - 無圧縮OpenDML AVI
+   - UtVideo OpenDML AVI
+3. MOVまたはAVIファイル作成
 
 ## UT Video Codec
 
-64bit版UT Video Codecを使用する。
-
-通常のインストール場所:
-
-```text
-C:\Program Files\utvideo
-```
+FFmpeg内蔵のUtVideoエンコーダーを使用するため、Codecの別途インストールは不要。

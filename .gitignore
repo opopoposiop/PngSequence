@@ -11,6 +11,9 @@ tools/
 gh_*.msi
 gh_*.zip
 gh-install.log
+vendor/downloads/
+vendor/ffmpeg/ffmpeg.exe
+vendor/extract-*/
 
 # IDE and OS files.
 .vs/

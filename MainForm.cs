@@ -15,15 +15,15 @@ namespace PngSequenceAvi;
  * - BuildUi、ConfigureDropPanel、CreateSettingsCard内の見た目
  *
  * 変更不可の箇所:
- * - ConvertAsyncからAviWriter.Writeへ渡す値と処理順
+ * - ConvertAsyncからVideoWriter.WriteAsyncへ渡す値と処理順
  * - InvokeRequiredを使ったUIスレッドへの切り替え
  * - CancellationTokenSourceの生成、Cancel、Dispose
  * - ComboBoxのP/Invoke構造体とDllImport宣言
  *
  * Codex用覚書:
- * - HOW: UI部品は小さな作成メソッドへ分け、変換処理はAviWriterへ委譲します。
+ * - HOW: UI部品は小さな作成メソッドへ分け、変換処理はVideoWriterへ委譲します。
  * - WHY NOT: 見た目の修正時に変換ロジックをMainFormへ追加しません。
- *   UIとAVI処理が混ざると、表示変更だけで出力結果を壊す危険が増えるためです。
+ *   UIと動画処理が混ざると、表示変更だけで出力結果を壊す危険が増えるためです。
  */
 public sealed class MainForm : Form
 {
@@ -54,7 +54,7 @@ public sealed class MainForm : Form
     private readonly RoundedButton _stopButton = new();
     private readonly RoundedButton _selectFilesButton = new();
     private readonly DropZonePanel _dropPanel = new();
-    private readonly AviWriter _writer = new();
+    private readonly VideoWriter _writer = new();
 
     private CancellationTokenSource? _cancellation;
     private SequenceSpec? _sequence;
@@ -62,7 +62,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "PNG Sequence AVI Forge";
+        Text = "PNG Sequence Video Forge";
         MinimumSize = new Size(1040, 720);
         Size = new Size(1280, 760);
         BackColor = Background;
@@ -324,7 +324,7 @@ public sealed class MainForm : Form
 
     private Control CreatePathInput()
     {
-        var field = CreateFieldLayout("AVI出力先フォルダー", 2);
+        var field = CreateFieldLayout("動画出力先フォルダー", 2);
         var row = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -405,12 +405,12 @@ public sealed class MainForm : Form
 
     private Control CreateCodecInput()
     {
-        var field = CreateFieldLayout("AVI圧縮形式   使用可能な形式を表示", 2);
+        var field = CreateFieldLayout("出力形式   同梱FFmpegで変換", 2);
 
         _codecBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _codecBox.DrawMode = DrawMode.OwnerDrawFixed;
-        _codecBox.ItemHeight = 36;
-        _codecBox.DropDownHeight = 146;
+        _codecBox.ItemHeight = 30;
+        _codecBox.DropDownHeight = 128;
         _codecBox.MaxDropDownItems = 4;
         _codecBox.IntegralHeight = false;
         _codecBox.Dock = DockStyle.Fill;
@@ -421,7 +421,7 @@ public sealed class MainForm : Form
         _codecBox.Margin = new Padding(0);
         _codecBox.DrawItem += DrawCodecItem;
         _codecBox.DropDown += (_, _) => BeginInvoke(new Action(() => ApplyComboDropDownRegion(_codecBox, 8)));
-        _codecBox.Items.AddRange(AviWriter.GetCodecChoices().Cast<object>().ToArray());
+        _codecBox.Items.AddRange(VideoWriter.GetOutputChoices().Cast<object>().ToArray());
         _codecBox.SelectedIndex = 0;
         var codecHost = CreateRoundedFieldHost(
             _codecBox,
@@ -467,7 +467,7 @@ public sealed class MainForm : Form
         panel.Controls.Add(_progressBar, 0, 1);
         panel.Controls.Add(new Label
         {
-            Text = "圧縮方式は実際に利用できるか確認して表示します。RGBA系はアルファを保持します。",
+            Text = "ProRes 4444 MOVはアルファを保持します。AVIはOpenDML対応で4GBを超えても単一ファイルです。",
             Dock = DockStyle.Top,
             AutoSize = true,
             ForeColor = SubtleText,
@@ -489,7 +489,7 @@ public sealed class MainForm : Form
             Margin = new Padding(0)
         };
 
-        ConfigurePrimaryButton(_convertButton, "AVIに変換");
+        ConfigurePrimaryButton(_convertButton, "動画に変換");
         ConfigureDisabledButton(_stopButton, "停止");
         _stopButton.Enabled = false;
         actions.Controls.Add(_convertButton);
@@ -662,9 +662,9 @@ public sealed class MainForm : Form
     private void DrawCodecItem(object? sender, DrawItemEventArgs e)
     {
         // WHY NOT: 標準ComboBoxの描画は使いません。
-        // 文字サイズ、項目高、使用可否バッジをデザイン仕様どおり表示できないためです。
+        // 文字サイズ、項目高、同梱バッジをデザイン仕様どおり表示できないためです。
         e.DrawBackground();
-        if (e.Index < 0 || _codecBox.Items[e.Index] is not AviCodecChoice choice)
+        if (e.Index < 0 || _codecBox.Items[e.Index] is not VideoOutputChoice choice)
         {
             return;
         }
@@ -675,11 +675,9 @@ public sealed class MainForm : Form
         using var backgroundBrush = new SolidBrush(background);
         e.Graphics.FillRectangle(backgroundBrush, e.Bounds);
 
-        var label = choice.IsUncompressed
-            ? "無圧縮 AVI"
-            : $"{choice.DisplayName} [{AviWriter.FourCcToString(choice.FourCc)}]";
-        var textColor = choice.IsAvailable ? TextColor : Color.FromArgb(127, 127, 127);
-        var badgeText = choice.IsAvailable ? "使用可能" : "使用不可";
+        var label = choice.DisplayName;
+        var textColor = TextColor;
+        const string badgeText = "同梱";
         using var badgeFont = new Font(Font.FontFamily, 8F, FontStyle.Bold);
         var badgeSize = TextRenderer.MeasureText(badgeText, badgeFont);
         var badgeWidth = badgeSize.Width + 18;
@@ -703,8 +701,8 @@ public sealed class MainForm : Form
                 e.Bounds.Top + (e.Bounds.Height - 24) / 2,
                 badgeWidth,
                 24);
-            var badgeColor = choice.IsAvailable ? SuccessTint : Color.FromArgb(242, 242, 242);
-            var badgeTextColor = choice.IsAvailable ? Color.FromArgb(17, 90, 54) : SubtleText;
+            var badgeColor = SuccessTint;
+            var badgeTextColor = Color.FromArgb(17, 90, 54);
             using var badgePath = CreateRoundedPath(badgeBounds, 12);
             using var badgeBrush = new SolidBrush(badgeColor);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
@@ -794,7 +792,7 @@ public sealed class MainForm : Form
     {
         _outputFolderBox.Text = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
         Log("準備完了。PNG連番ファイルをドロップしてください。");
-        Log($"圧縮方式候補: {_codecBox.Items.Count} 件");
+        Log($"出力形式候補: {_codecBox.Items.Count} 件");
     }
 
     private void OnDragEnter(object? sender, DragEventArgs e)
@@ -868,7 +866,7 @@ public sealed class MainForm : Form
 
     private async Task ConvertAsync()
     {
-        // HOW: 入力確認後にUIを実行中状態へ切り替え、重いAVI書き込みだけをバックグラウンドで実行します。
+        // HOW: 入力確認後にUIを実行中状態へ切り替え、FFmpegの非同期変換を待機します。
         var running = false;
 
         try
@@ -887,45 +885,26 @@ public sealed class MainForm : Form
             }
 
             var codec = GetSelectedCodec();
-            if (!codec.IsAvailable)
-            {
-                MessageBox.Show(this, "選択した圧縮方式はこの環境では使用可能として確認できませんでした。", "圧縮方式エラー", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
             var baseName = SanitizeFileName(string.IsNullOrWhiteSpace(_sequence.Prefix) ? "png_sequence" : _sequence.Prefix.TrimEnd('_', '-', ' '));
-            var outputPath = Path.Combine(outputFolder, $"{baseName}_{codec.FileSuffix}.avi");
+            var outputPath = Path.Combine(outputFolder, $"{baseName}_{codec.FileSuffix}{codec.Extension}");
 
             SetRunning(true);
             running = true;
             _cancellation = new CancellationTokenSource();
             ResetProgress(_sequence.Count);
 
-            Log($"AVI作成を開始します: {outputPath}");
-            // WHY NOT: AVI書き込みをUIスレッド上で直接実行しません。
-            // 変換中に画面が固まり、停止ボタンや進捗表示が動かなくなるためです。
-            var outputPaths = await Task.Run(() => _writer.Write(
+            Log($"動画作成を開始します: {outputPath}");
+            var completedPath = await _writer.WriteAsync(
                 _sequence.Files,
                 outputPath,
                 fps.Value,
                 codec,
                 LogFromAnyThread,
                 UpdateProgressFromAnyThread,
-                _cancellation.Token));
+                _cancellation.Token);
 
             SetProgress(_sequence.Count);
-            if (outputPaths.Count == 1)
-            {
-                Log($"AVI作成完了: {outputPaths[0]}");
-            }
-            else
-            {
-                Log($"AVI作成完了: {outputPaths.Count} ファイルに分割しました。");
-                foreach (var path in outputPaths)
-                {
-                    Log($"  {path}");
-                }
-            }
+            Log($"動画作成完了: {completedPath}");
         }
         catch (OperationCanceledException)
         {
@@ -934,7 +913,7 @@ public sealed class MainForm : Form
         catch (Exception ex)
         {
             Log($"エラー: {ex.Message}");
-            MessageBox.Show(this, ex.Message, "AVI作成エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, ex.Message, "動画作成エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
         {
@@ -953,7 +932,7 @@ public sealed class MainForm : Form
         var folder = _outputFolderBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(folder))
         {
-            throw new InvalidOperationException("AVI出力先フォルダを指定してください。");
+            throw new InvalidOperationException("動画出力先フォルダを指定してください。");
         }
 
         Directory.CreateDirectory(folder);
@@ -971,17 +950,17 @@ public sealed class MainForm : Form
         return null;
     }
 
-    private AviCodecChoice GetSelectedCodec()
+    private VideoOutputChoice GetSelectedCodec()
     {
-        return _codecBox.SelectedItem as AviCodecChoice
-            ?? throw new InvalidOperationException("AVI圧縮方式を選択してください。");
+        return _codecBox.SelectedItem as VideoOutputChoice
+            ?? throw new InvalidOperationException("出力形式を選択してください。");
     }
 
     private void BrowseOutputFolder()
     {
         using var dialog = new FolderBrowserDialog
         {
-            Description = "AVI出力先フォルダを選択",
+            Description = "動画出力先フォルダを選択",
             UseDescriptionForTitle = true
         };
 

@@ -16,6 +16,8 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+& (Join-Path $PSScriptRoot "prepare-ffmpeg.ps1")
+
 dotnet publish `
   -c Release `
   -r win-x64 `
