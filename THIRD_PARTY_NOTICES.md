@@ -1,6 +1,6 @@
 # Third-party notices
 
-PngSequenceAvi v1.3.0 embeds an FFmpeg executable and extracts it to the
+PngSequenceAvi v1.3.1 embeds an FFmpeg executable and extracts it to the
 current user's local application data directory when video conversion is first
 used. The application starts FFmpeg as a separate process.
 

@@ -409,15 +409,20 @@ public sealed class MainForm : Form
 
         _codecBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _codecBox.DrawMode = DrawMode.OwnerDrawFixed;
-        _codecBox.ItemHeight = 30;
-        _codecBox.DropDownHeight = 128;
+        _codecBox.Font = new Font(Font.FontFamily, 12.75F, FontStyle.Regular, GraphicsUnit.Point);
+        var codecTextHeight = TextRenderer.MeasureText(
+            "Ag",
+            _codecBox.Font,
+            Size.Empty,
+            TextFormatFlags.NoPadding).Height;
+        _codecBox.ItemHeight = codecTextHeight;
+        _codecBox.DropDownHeight = codecTextHeight * 4 + 8;
         _codecBox.MaxDropDownItems = 4;
         _codecBox.IntegralHeight = false;
         _codecBox.Dock = DockStyle.Fill;
         _codecBox.BackColor = Surface;
         _codecBox.ForeColor = TextColor;
         _codecBox.FlatStyle = FlatStyle.Flat;
-        _codecBox.Font = new Font(Font.FontFamily, 12.75F, FontStyle.Regular, GraphicsUnit.Point);
         _codecBox.Margin = new Padding(0);
         _codecBox.DrawItem += DrawCodecItem;
         _codecBox.DropDown += (_, _) => BeginInvoke(new Action(() => ApplyComboDropDownRegion(_codecBox, 8)));
@@ -429,7 +434,7 @@ public sealed class MainForm : Form
             Surface,
             new Padding(3));
         codecHost.Dock = DockStyle.Top;
-        codecHost.Height = 48;
+        codecHost.Height = codecTextHeight + 8;
         field.Controls.Add(codecHost, 0, 1);
 
         return field;
@@ -681,11 +686,16 @@ public sealed class MainForm : Form
         using var badgeFont = new Font(Font.FontFamily, 8F, FontStyle.Bold);
         var badgeSize = TextRenderer.MeasureText(badgeText, badgeFont);
         var badgeWidth = badgeSize.Width + 18;
+        var textHeight = TextRenderer.MeasureText(
+            label,
+            e.Font,
+            Size.Empty,
+            TextFormatFlags.NoPadding).Height;
         var textBounds = new Rectangle(
             e.Bounds.Left + 16,
-            e.Bounds.Top,
+            e.Bounds.Top + Math.Max(0, (e.Bounds.Height - textHeight) / 2),
             Math.Max(0, e.Bounds.Width - badgeWidth - 42),
-            e.Bounds.Height);
+            Math.Min(textHeight, e.Bounds.Height));
         TextRenderer.DrawText(
             e.Graphics,
             label,
@@ -696,14 +706,15 @@ public sealed class MainForm : Form
 
         if (e.Bounds.Width > 280)
         {
+            var badgeHeight = Math.Clamp(e.Bounds.Height - 4, 16, 20);
             var badgeBounds = new Rectangle(
                 e.Bounds.Right - badgeWidth - 14,
-                e.Bounds.Top + (e.Bounds.Height - 24) / 2,
+                e.Bounds.Top + (e.Bounds.Height - badgeHeight) / 2,
                 badgeWidth,
-                24);
+                badgeHeight);
             var badgeColor = SuccessTint;
             var badgeTextColor = Color.FromArgb(17, 90, 54);
-            using var badgePath = CreateRoundedPath(badgeBounds, 12);
+            using var badgePath = CreateRoundedPath(badgeBounds, badgeHeight / 2);
             using var badgeBrush = new SolidBrush(badgeColor);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.FillPath(badgeBrush, badgePath);
