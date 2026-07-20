@@ -55,6 +55,7 @@ public sealed class MainForm : Form
     private readonly RoundedButton _selectFilesButton = new();
     private readonly DropZonePanel _dropPanel = new();
     private readonly VideoWriter _writer = new();
+    private RoundedFieldPanel? _codecHost;
 
     private CancellationTokenSource? _cancellation;
     private SequenceSpec? _sequence;
@@ -75,6 +76,50 @@ public sealed class MainForm : Form
         BuildUi();
         WireEvents();
         SetInitialValues();
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        ApplyCodecMetrics();
+    }
+
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        BeginInvoke(new Action(ApplyCodecMetrics));
+    }
+
+    private void ApplyCodecMetrics()
+    {
+        if (_codecHost is null || !_codecBox.IsHandleCreated)
+        {
+            return;
+        }
+
+        using var graphics = _codecBox.CreateGraphics();
+        var textHeight = TextRenderer.MeasureText(
+            graphics,
+            "Ag",
+            _codecBox.Font,
+            Size.Empty,
+            TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Height;
+        var itemPadding = ScaleCodecPixels(6);
+
+        _codecBox.ItemHeight = textHeight + itemPadding;
+        _codecBox.DropDownHeight = _codecBox.ItemHeight * 4 + ScaleCodecPixels(8);
+
+        // ComboBox本体の枠・ボタンと、外側の角丸枠の余白も含めます。
+        _codecHost.Height = Math.Max(
+            _codecBox.PreferredHeight + _codecHost.Padding.Vertical,
+            _codecBox.ItemHeight + _codecHost.Padding.Vertical + ScaleCodecPixels(4));
+        _codecHost.PerformLayout();
+        _codecBox.Invalidate();
+    }
+
+    private int ScaleCodecPixels(int logicalPixels)
+    {
+        return Math.Max(1, (int)Math.Round(logicalPixels * _codecBox.DeviceDpi / 96F));
     }
 
     private void BuildUi()
@@ -410,13 +455,8 @@ public sealed class MainForm : Form
         _codecBox.DropDownStyle = ComboBoxStyle.DropDownList;
         _codecBox.DrawMode = DrawMode.OwnerDrawFixed;
         _codecBox.Font = new Font(Font.FontFamily, 12.75F, FontStyle.Regular, GraphicsUnit.Point);
-        var codecTextHeight = TextRenderer.MeasureText(
-            "Ag",
-            _codecBox.Font,
-            Size.Empty,
-            TextFormatFlags.NoPadding).Height;
-        _codecBox.ItemHeight = codecTextHeight;
-        _codecBox.DropDownHeight = codecTextHeight * 4 + 8;
+        _codecBox.ItemHeight = 30;
+        _codecBox.DropDownHeight = 128;
         _codecBox.MaxDropDownItems = 4;
         _codecBox.IntegralHeight = false;
         _codecBox.Dock = DockStyle.Fill;
@@ -428,14 +468,14 @@ public sealed class MainForm : Form
         _codecBox.DropDown += (_, _) => BeginInvoke(new Action(() => ApplyComboDropDownRegion(_codecBox, 8)));
         _codecBox.Items.AddRange(VideoWriter.GetOutputChoices().Cast<object>().ToArray());
         _codecBox.SelectedIndex = 0;
-        var codecHost = CreateRoundedFieldHost(
+        _codecHost = CreateRoundedFieldHost(
             _codecBox,
             new Padding(0),
             Surface,
             new Padding(3));
-        codecHost.Dock = DockStyle.Top;
-        codecHost.Height = codecTextHeight + 8;
-        field.Controls.Add(codecHost, 0, 1);
+        _codecHost.Dock = DockStyle.Top;
+        _codecHost.Height = 48;
+        field.Controls.Add(_codecHost, 0, 1);
 
         return field;
     }
@@ -684,18 +724,18 @@ public sealed class MainForm : Form
         var textColor = TextColor;
         const string badgeText = "同梱";
         using var badgeFont = new Font(Font.FontFamily, 8F, FontStyle.Bold);
-        var badgeSize = TextRenderer.MeasureText(badgeText, badgeFont);
-        var badgeWidth = badgeSize.Width + 18;
-        var textHeight = TextRenderer.MeasureText(
-            label,
-            e.Font,
+        var badgeSize = TextRenderer.MeasureText(
+            e.Graphics,
+            badgeText,
+            badgeFont,
             Size.Empty,
-            TextFormatFlags.NoPadding).Height;
+            TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+        var badgeWidth = badgeSize.Width + ScaleCodecPixels(18);
         var textBounds = new Rectangle(
-            e.Bounds.Left + 16,
-            e.Bounds.Top + Math.Max(0, (e.Bounds.Height - textHeight) / 2),
-            Math.Max(0, e.Bounds.Width - badgeWidth - 42),
-            Math.Min(textHeight, e.Bounds.Height));
+            e.Bounds.Left + ScaleCodecPixels(16),
+            e.Bounds.Top,
+            Math.Max(0, e.Bounds.Width - badgeWidth - ScaleCodecPixels(42)),
+            e.Bounds.Height);
         TextRenderer.DrawText(
             e.Graphics,
             label,
@@ -704,11 +744,13 @@ public sealed class MainForm : Form
             textColor,
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
 
-        if (e.Bounds.Width > 280)
+        if (e.Bounds.Width > ScaleCodecPixels(280))
         {
-            var badgeHeight = Math.Clamp(e.Bounds.Height - 4, 16, 20);
+            var badgeHeight = Math.Min(
+                ScaleCodecPixels(20),
+                Math.Max(ScaleCodecPixels(16), e.Bounds.Height - ScaleCodecPixels(6)));
             var badgeBounds = new Rectangle(
-                e.Bounds.Right - badgeWidth - 14,
+                e.Bounds.Right - badgeWidth - ScaleCodecPixels(14),
                 e.Bounds.Top + (e.Bounds.Height - badgeHeight) / 2,
                 badgeWidth,
                 badgeHeight);
