@@ -1,6 +1,6 @@
 # PNG Sequence Video Forge
 
-連番PNGを読み込み、Apple ProRes 4444 MOVまたはOpenDML AVIへ変換するWindowsデスクトップアプリです。
+連番PNGを読み込み、Apple ProRes 4444 MOVまたはOpenDML AVIへ変換するWindowsアプリです。
 
 ## v1.3.2の変更
 
