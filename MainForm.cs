@@ -6,25 +6,6 @@ using System.Windows.Forms;
 
 namespace PngSequenceAvi;
 
-/*
- * アプリの画面表示、ボタン操作、ドラッグ＆ドロップ、進捗表示を担当します。
- *
- * ユーザーが変更してよい箇所:
- * - ファイル先頭にある色定義
- * - 画面の文言、余白、フォントサイズ、角丸半径
- * - BuildUi、ConfigureDropPanel、CreateSettingsCard内の見た目
- *
- * 変更不可の箇所:
- * - ConvertAsyncからVideoWriter.WriteAsyncへ渡す値と処理順
- * - InvokeRequiredを使ったUIスレッドへの切り替え
- * - CancellationTokenSourceの生成、Cancel、Dispose
- * - ComboBoxのP/Invoke構造体とDllImport宣言
- *
- * Codex用覚書:
- * - HOW: UI部品は小さな作成メソッドへ分け、変換処理はVideoWriterへ委譲します。
- * - WHY NOT: 見た目の修正時に変換ロジックをMainFormへ追加しません。
- *   UIと動画処理が混ざると、表示変更だけで出力結果を壊す危険が増えるためです。
- */
 public sealed class MainForm : Form
 {
     private static readonly Color Background = Color.FromArgb(247, 248, 250);
@@ -124,7 +105,7 @@ public sealed class MainForm : Form
 
     private void BuildUi()
     {
-        // HOW: 画面全体を「見出し」と「左:読込/ログ、右:変換設定」の2段構成で組み立てます。
+        // 画面全体を見出しと、読み込み・ログ・変換設定の2段構成で組み立てます。
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -158,7 +139,7 @@ public sealed class MainForm : Form
         };
         headingStack.Controls.Add(new Label
         {
-            Text = "PNG Sequence AVI Forge",
+            Text = "PNG Sequence Video Forge",
             AutoSize = true,
             ForeColor = TextColor,
             Font = new Font(Font.FontFamily, 21F, FontStyle.Bold),
@@ -166,7 +147,7 @@ public sealed class MainForm : Form
         }, 0, 0);
         headingStack.Controls.Add(new Label
         {
-            Text = "連番PNGを読み込み、AVIファイルへ変換します。",
+            Text = "連番PNGを読み込み、MOVまたはAVIへ変換します。",
             AutoSize = true,
             ForeColor = SubtleText,
             Font = new Font(Font.FontFamily, 10F),
@@ -680,7 +661,7 @@ public sealed class MainForm : Form
 
     private static void ApplyComboDropDownRegion(ComboBox comboBox, int logicalRadius)
     {
-        // HOW: 展開候補は別のWindowsウィンドウなので、そのウィンドウへDPI対応の角丸領域を設定します。
+        // 展開候補は別のWindowsウィンドウになるため、表示時にDPI対応の角丸領域を設定します。
         var info = new ComboBoxInfo { Size = Marshal.SizeOf<ComboBoxInfo>() };
         if (!GetComboBoxInfo(comboBox.Handle, ref info)
             || info.ListHandle == IntPtr.Zero
@@ -706,8 +687,7 @@ public sealed class MainForm : Form
 
     private void DrawCodecItem(object? sender, DrawItemEventArgs e)
     {
-        // WHY NOT: 標準ComboBoxの描画は使いません。
-        // 文字サイズ、項目高、同梱バッジをデザイン仕様どおり表示できないためです。
+        // 標準ComboBoxの描画では、文字サイズ・項目高・同梱バッジを個別に調整できないため、独自描画します。
         e.DrawBackground();
         if (e.Index < 0 || _codecBox.Items[e.Index] is not VideoOutputChoice choice)
         {
@@ -805,7 +785,7 @@ public sealed class MainForm : Form
         public IntPtr ListHandle;
     }
 
-    // 変更不可: ComboBoxの展開リストを角丸化するWindows API契約です。
+    // ComboBoxのポップアップは別のネイティブウィンドウになるため、表示時に領域を調整します。
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetComboBoxInfo(IntPtr comboBoxHandle, ref ComboBoxInfo info);
@@ -919,7 +899,7 @@ public sealed class MainForm : Form
 
     private async Task ConvertAsync()
     {
-        // HOW: 入力確認後にUIを実行中状態へ切り替え、FFmpegの非同期変換を待機します。
+        // 入力確認後にUIを実行中状態へ切り替え、FFmpegの非同期変換を待機します。
         var running = false;
 
         try
@@ -1191,8 +1171,7 @@ public sealed class MainForm : Form
 
     private sealed class RoundedButton : Button
     {
-        // WHY NOT: 標準Buttonの枠をリージョンで切り抜きません。
-        // 高DPI環境で角が斜めに切れたように見えるため、アンチエイリアスで直接描画します。
+        // 高DPI環境で角が斜めに切れないよう、標準Buttonの枠ではなくアンチエイリアスで直接描画します。
         private bool _isHovered;
 
         public Color FillColor { get; set; } = Surface;

@@ -5,6 +5,7 @@ obj/
 # Local UI captures and design previews.
 *.png
 design-preview/
+artifacts/
 
 # Local tool/install artifacts.
 tools/
@@ -19,5 +20,9 @@ vendor/extract-*/
 .vs/
 *.user
 *.suo
+.DS_Store
 Thumbs.db
 Desktop.ini
+
+# Test output.
+TestResults/

@@ -1,20 +1,16 @@
 param(
-    [string]$ExecutablePath = "D:\Projects\PngSequence\bin\Release\net8.0-windows\win-x64\PngSequenceAvi.exe",
-    [string]$OutputPath = "D:\Projects\PngSequence\current-ui.png",
+    [Parameter(Mandatory = $true)]
+    [string]$ExecutablePath,
+    [string]$OutputPath = (Join-Path $PSScriptRoot "artifacts\current-ui.png"),
     [switch]$OpenCodecList
 )
 
-# UI検証専用スクリプトです。アプリの変換処理や利用者向け機能には含まれません。
-#
-# ユーザーが変更してよい箇所:
-# - ExecutablePath、OutputPath
-#
-# 変更不可の箇所:
-# - DPI awareness設定とウィンドウ終了処理。高DPI画面の正確な撮影とプロセス残留防止に必要です。
-#
-# Codex用覚書:
-# - HOW: 対象アプリを一時起動し、タイトル一致したウィンドウだけをPNGへ保存して終了する。
-# - WHY NOT: 画面全体を無条件に撮影しない。背面アプリや個人情報が写る可能性があるため。
+# UI検証用に対象ウィンドウだけを撮影します。
+
+$outputDirectory = Split-Path -Parent $OutputPath
+if (-not [string]::IsNullOrWhiteSpace($outputDirectory)) {
+    New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
+}
 
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName UIAutomationClient
@@ -55,7 +51,7 @@ try {
     for ($attempt = 0; $attempt -lt 50 -and $null -eq $windowProcess; $attempt++) {
         Start-Sleep -Milliseconds 100
         $windowProcess = Get-Process | Where-Object {
-            $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -eq "PNG Sequence AVI Forge"
+            $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -eq "PNG Sequence Video Forge"
         } | Select-Object -First 1
     }
 

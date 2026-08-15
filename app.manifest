@@ -1,18 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
-  <!--
-    Windowsへ渡す実行権限の宣言です。
-
-    ユーザーが変更してよい箇所:
-    - 通常はありません。
-
-    変更不可の箇所:
-    - requestedExecutionLevelを安易にrequireAdministratorへ変更しない。
-
-    Codex用覚書:
-    - HOW: asInvokerで、アプリを起動したユーザーと同じ権限で動作する。
-    - WHY NOT: 管理者権限を要求しない。PNG読込とユーザー指定先へのAVI出力に不要なため。
-  -->
   <assemblyIdentity version="1.0.0.0" name="PngSequenceAvi.app"/>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
