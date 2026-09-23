@@ -14,12 +14,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="vendor\ffmpeg\ffmpeg.exe"
+    <EmbeddedResource Include="..\vendor\ffmpeg\ffmpeg.exe"
                       LogicalName="PngSequenceAvi.ffmpeg.exe" />
   </ItemGroup>
 
   <Target Name="EnsureEmbeddedFfmpeg" BeforeTargets="PrepareForBuild">
-    <Error Condition="!Exists('vendor\ffmpeg\ffmpeg.exe')"
-           Text="同梱FFmpegがありません。powershell -ExecutionPolicy Bypass -File .\prepare-ffmpeg.ps1 を実行してください。" />
+    <Error Condition="!Exists('..\vendor\ffmpeg\ffmpeg.exe')"
+           Text="同梱FFmpegがありません。powershell -ExecutionPolicy Bypass -File .\src\prepare-ffmpeg.ps1 を実行してください。" />
   </Target>
 </Project>

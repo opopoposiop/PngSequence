@@ -76,23 +76,23 @@ AVIはFFmpegのOpenDML対応AVI muxerで作成します。従来のRIFF AVIの�
 通常のReleaseビルド：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\prepare-ffmpeg.ps1
-dotnet build -c Release
+powershell -ExecutionPolicy Bypass -File .\src\prepare-ffmpeg.ps1
+dotnet build .\src\PngSequenceAvi.csproj -c Release
 ```
 
 単一実行ファイルの作成：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\build-single-exe.ps1
+powershell -ExecutionPolicy Bypass -File .\src\build-single-exe.ps1
 ```
 
 生成物：
 
 ```text
-bin\Release\net8.0-windows\win-x64\publish\PngSequenceAvi.exe
+src\bin\Release\net8.0-windows\win-x64\publish\PngSequenceAvi.exe
 ```
 
-`vendor/ffmpeg/ffmpeg.exe`はリポジトリへコミットせず、`prepare-ffmpeg.ps1`で取得してください。
+`vendor/ffmpeg/ffmpeg.exe`はリポジトリへコミットせず、`src/prepare-ffmpeg.ps1`で取得してください。
 
 ## リリース確認項目
 

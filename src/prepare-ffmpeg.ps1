@@ -7,8 +7,10 @@ $archiveName = "ffmpeg-n8.1.2-22-g94138f6973-win64-lgpl-8.1.zip"
 $archiveUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-07-18-13-13/$archiveName"
 $archiveSha256 = "268F45C3D6D17718BB84E3B0A7F3155D966D4B65F2FE8D059C8598A38BBE01FD"
 $ffmpegSha256 = "9203AD8B3940926730575C9EE0845B5FEDCA59EC39C1D3A6161F4F6417A07C1A"
-$downloadsDirectory = Join-Path $PSScriptRoot "vendor\downloads"
-$ffmpegDirectory = Join-Path $PSScriptRoot "vendor\ffmpeg"
+$repositoryRoot = Split-Path -Parent $PSScriptRoot
+$vendorDirectory = Join-Path $repositoryRoot "vendor"
+$downloadsDirectory = Join-Path $vendorDirectory "downloads"
+$ffmpegDirectory = Join-Path $vendorDirectory "ffmpeg"
 $archivePath = Join-Path $downloadsDirectory $archiveName
 $ffmpegPath = Join-Path $ffmpegDirectory "ffmpeg.exe"
 
@@ -45,7 +47,7 @@ if (-not (Test-ArchiveHash)) {
     throw "FFmpeg archive SHA-256 verification failed: $archivePath"
 }
 
-$extractDirectory = Join-Path (Join-Path $PSScriptRoot "vendor") ("extract-" + [Guid]::NewGuid().ToString("N"))
+$extractDirectory = Join-Path $vendorDirectory ("extract-" + [Guid]::NewGuid().ToString("N"))
 try {
     Expand-Archive -LiteralPath $archivePath -DestinationPath $extractDirectory
     $sourceFfmpeg = Get-ChildItem -LiteralPath $extractDirectory -Filter "ffmpeg.exe" -File -Recurse |
@@ -61,7 +63,7 @@ try {
 }
 finally {
     if (Test-Path -LiteralPath $extractDirectory) {
-        $resolvedVendor = (Resolve-Path (Join-Path $PSScriptRoot "vendor")).Path
+        $resolvedVendor = (Resolve-Path $vendorDirectory).Path
         $resolvedExtract = (Resolve-Path $extractDirectory).Path
         if (-not $resolvedExtract.StartsWith($resolvedVendor + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
             throw "Refusing to remove an extraction directory outside vendor: $resolvedExtract"

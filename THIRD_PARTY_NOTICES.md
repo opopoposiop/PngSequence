@@ -20,7 +20,7 @@ first used. The application starts FFmpeg as a separate process.
 - Variant: `lgpl`
 - License: GNU Lesser General Public License; see the exact license text included in this repository
 
-The build is obtained from the pinned release above by `prepare-ffmpeg.ps1`.
+The build is obtained from the pinned release above by `src/prepare-ffmpeg.ps1`.
 The archive and extracted executable are SHA-256 checked before use. The
 corresponding FFmpeg source and build scripts are available from the linked
 FFmpeg and BtbN repositories. A copy of the license is included as

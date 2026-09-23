@@ -4,8 +4,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 & (Join-Path $PSScriptRoot "prepare-ffmpeg.ps1")
+$projectPath = Join-Path $PSScriptRoot "PngSequenceAvi.csproj"
 
 dotnet publish `
+  $projectPath `
   -c Release `
   -r win-x64 `
   --self-contained true `
@@ -19,4 +21,4 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Build completed."
-Write-Host "bin\Release\net8.0-windows\win-x64\publish\PngSequenceAvi.exe"
+Write-Host "src\bin\Release\net8.0-windows\win-x64\publish\PngSequenceAvi.exe"
