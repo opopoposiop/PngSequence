@@ -128,6 +128,7 @@ UI設計の参考として、[デジタル庁デザインシステム](https://d
 
 - [FFmpeg](https://ffmpeg.org/) — 動画変換
 - [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) — Windows向けFFmpegビルド
+- [Ut Video](https://github.com/umezawatakeshi/utvideo)  — Windows向けコーデック
 - [デジタル庁デザインシステム](https://design.digital.go.jp/dads/) — UI設計の参考
 
 ## ライセンス
