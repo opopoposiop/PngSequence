@@ -3,6 +3,7 @@ bin/
 obj/
 
 # Local UI captures and design previews.
+/capture-current-ui.ps1
 *.png
 design-preview/
 artifacts/
