@@ -8,8 +8,6 @@
 - ファイル名末尾の番号を使って連番を自動判定
 - ProRes 4444 MOVへのアルファチャンネル保持
 - OpenDML AVIによる大容量AVIの出力
-- FFmpegを単一EXEへ埋め込み、追加コーデックのインストール不要
-- 100%、150%、175%のWindows DPI設定に対応
 
 ## 動作環境
 
@@ -54,6 +52,7 @@ frame_0003.png
 8. UtVideo YUV422 BT.709 AVI (OpenDML)
 
 ProRes 4444は`prores_ks`、profile 4、`yuva444p10le`で出力し、RGBA PNGのアルファチャンネルを保持します。
+[Ut Video](https://github.com/umezawatakeshi/utvideo)は別途インストールが必要。PNG Sequenceには含まれません。
 
 AVIはFFmpegのOpenDML対応AVI muxerで作成します。従来のRIFF AVIの約4GB境界を超える場合も、自動分割せず単一の`.avi`として出力します。ただし、保存先ファイルシステムの最大ファイルサイズと空き容量の制限を受けます。4GBを超える出力にはNTFSまたはexFATを推奨します。
 
