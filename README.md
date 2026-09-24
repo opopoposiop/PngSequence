@@ -1,7 +1,7 @@
 # PNG Sequence Video Forge
 
 連番PNGをWindows上で動画へ変換するデスクトップアプリです。Apple ProRes 4444 MOV、無圧縮OpenDML AVI、UtVideo AVIを出力できます。
-
+![image](img/PngSequenceIMG.png)
 ## 特徴
 
 - PNGフォルダーまたは複数のPNGファイルを読み込み
